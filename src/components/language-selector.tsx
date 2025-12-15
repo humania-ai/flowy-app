@@ -33,10 +33,9 @@ export function LanguageSelector({
     if (onLanguageChange) {
       onLanguageChange(languageCode)
     }
-    // También guardarlo en localStorage para persistencia
+    // Guardar en localStorage para persistencia
     localStorage.setItem('flowy-language', languageCode)
-    // Recargar la página para aplicar el idioma
-    window.location.reload()
+    // NO recargar la página - dejar que el componente maneje el cambio
   }
 
   const currentLang = languages.find(lang => lang.code === selectedLanguage)

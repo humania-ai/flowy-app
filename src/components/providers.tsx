@@ -7,7 +7,7 @@ import { GamificationProvider } from '@/contexts/gamification-context'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider>
+    <SessionProvider session={null}>
       <LanguageProvider>
         <SubscriptionProvider>
           <GamificationProvider>
