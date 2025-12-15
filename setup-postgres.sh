@@ -1,62 +1,154 @@
 #!/bin/bash
 
-echo "🚀 Configuración PostgreSQL para Flowy"
+echo "🔧 Configuración Manual de PostgreSQL para Flowy"
 echo "=================================="
 
-# Verificar si PostgreSQL está instalado
-if ! command -v psql &> /dev/null; then
-    echo "❌ PostgreSQL no está instalado"
-    echo "📥 Instalando PostgreSQL..."
-    
-    # Para macOS con Homebrew
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        if command -v brew &> /dev/null; then
-            brew install postgresql
-        else
-            echo "❌ Homebrew no está instalado. Por favor instala Homebrew primero:"
-            echo "/bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-        fi
-    else
-        echo "❌ Por favor instala PostgreSQL manualmente"
-        exit 1
+echo "📋 Verificando instalación de PostgreSQL..."
+
+# Buscar PostgreSQL en ubicaciones comunes
+POSTGRES_PATHS=(
+    "/usr/local/bin/psql"
+    "/usr/bin/psql"
+    "/opt/homebrew/bin/psql"
+    "/Applications/Postgres.app/Contents/Versions/latest/bin/psql"
+)
+
+PSQL_PATH=""
+for path in "${POSTGRES_PATHS[@]}"; do
+    if [ -f "$path" ]; then
+        PSQL_PATH="$path"
+        echo "✅ PostgreSQL encontrado en: $PSQL_PATH"
+        break
     fi
-else
-    echo "✅ PostgreSQL ya está instalado"
+done
+
+if [ -z "$PSQL_PATH" ]; then
+    echo "❌ PostgreSQL no encontrado. Por favor instala PostgreSQL:"
+    echo ""
+    echo "Opción 1 - Homebrew (macOS):"
+    echo "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+    echo ""
+    echo "Opción 2 - Descargar directamente:"
+    echo "  https://www.postgresql.org/download/macosx/"
+    echo ""
+    echo "Opción 3 - Docker:"
+    echo "  docker run --name postgres -e POSTGRES_PASSWORD=password -p 5432:5432 postgres:15"
+    exit 1
 fi
 
-# Verificar si PostgreSQL está corriendo
-if ! pg_isready -q; then
-    echo "🔄 Iniciando PostgreSQL..."
-    brew services start postgresql 2>/dev/null || sudo systemctl start postgresql 2>/dev/null || echo "Por favor inicia PostgreSQL manualmente"
+echo "🗄️ Iniciando servicio PostgreSQL..."
+
+# Intentar diferentes métodos para iniciar PostgreSQL
+if command -v brew &> /dev/null; then
+    echo "🍺 Usando Homebrew..."
+    brew services start postgresql 2>/dev/null &
+    PG_PID=$!
     sleep 3
+elif [ -f "/Applications/Postgres.app" ]; then
+    echo "🍎 Usando PostgreSQL app..."
+    open -a "postgres://localhost:5432" &
+    PG_PID=$!
+    sleep 3
+else
+    echo "🔄 Intentando iniciar PostgreSQL manualmente..."
+    # Intentar con pg_ctl si está disponible
+    if command -v pg_ctl &> /dev/null; then
+        pg_ctl -D /usr/local/var/postgresql start 2>/dev/null &
+        PG_PID=$!
+        sleep 3
+    else
+        echo "⚠️ No se pudo iniciar PostgreSQL automáticamente"
+        echo "Por favor inicia PostgreSQL manualmente y luego presiona Enter para continuar..."
+        read -p "Presiona Enter cuando PostgreSQL esté corriendo..."
+    fi
 fi
 
-# Crear base de datos y usuario
-echo "🗄️ Creando base de datos y usuario..."
-createdb flowy_db 2>/dev/null || echo "⚠️  La base de datos ya existe"
+echo "🔧 Configurando base de datos y permisos..."
 
-# Crear usuario postgres si no existe
-psql -U postgres -d template1 -c "CREATE USER flowy_user WITH PASSWORD 'flowy_password';" 2>/dev/null || echo "✅ Usuario flowy_user ya existe"
+# Esperar a que PostgreSQL esté disponible
+echo "⏳ Esperando a que PostgreSQL esté listo..."
+sleep 5
 
-# Dar permisos al usuario
-psql -U postgres -d template1 -c "GRANT ALL PRIVILEGES ON DATABASE flowy_db TO flowy_user;" 2>/dev/null
+# Verificar si PostgreSQL está corriendo en el puerto 5432
+if ! nc -z localhost 5432 &> /dev/null; then
+    echo "❌ PostgreSQL no está corriendo en el puerto 5432"
+    echo "Por favor inicia PostgreSQL manualmente:"
+    echo ""
+    echo "Con Homebrew: brew services start postgresql"
+    echo "Con PostgreSQL app: open /Applications/Postgres.app"
+    echo "Con pg_ctl: pg_ctl -D /usr/local/var/postgresql start"
+    echo ""
+    echo "Luego presiona Enter para continuar..."
+    read -p "Presiona Enter cuando PostgreSQL esté corriendo..."
+fi
 
-echo "✅ Configuración completada!"
-echo ""
-echo "📋 Datos de conexión:"
-echo "   Host: localhost"
-echo "   Puerto: 5432"
-echo "   Base de datos: flowy_db"
-echo "   Usuario: flowy_user"
-echo "   Contraseña: flowy_password"
-echo ""
-echo "🔗 URL de conexión:"
-echo "   DATABASE_URL=\"postgresql://flowy_user:flowy_password@localhost:5432/flowy_db?schema=public\""
-echo ""
-echo "📝 Copia esta URL en tu archivo .env:"
-echo "   DATABASE_URL=\"postgresql://flowy_user:flowy_password@localhost:5432/flowy_db?schema=public\""
-echo ""
-echo "🚀 Luego ejecuta:"
-echo "   npm run db:push"
-echo "   npm run db:generate"
-echo "   npm run dev"
+# Crear base de datos si no existe
+echo "🗄️ Creando base de datos flowy_db..."
+$PSQL_PATH -U postgres -h localhost -p 5432 -c "
+CREATE DATABASE flowy_db;
+\q
+" 2>/dev/null
+
+# Crear usuario si no existe
+echo "👤 Creando usuario flowy_user..."
+$PSQL_PATH -U postgres -h localhost -p 5432 -c "
+CREATE USER flowy_user WITH PASSWORD 'flowy_password';
+\q
+" 2>/dev/null
+
+# Dar permisos
+echo "🔐 Configurando permisos..."
+$PSQL_PATH -U postgres -h localhost -p 5432 -c "
+-- Dar todos los permisos al usuario flowy_user
+GRANT ALL PRIVILEGES ON DATABASE flowy_db TO flowy_user;
+GRANT ALL PRIVILEGES ON SCHEMA public TO flowy_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT flowy_user;
+
+-- Hacer owner de la base de datos
+ALTER DATABASE flowy_db OWNER TO flowy_user;
+\q
+" 2>/dev/null
+
+if [ $? -eq 0 ]; then
+    echo "✅ Configuración completada exitosamente!"
+    echo ""
+    echo "📋 Datos de conexión:"
+    echo "   Host: localhost"
+    echo "   Puerto: 5432"
+    echo "   Base de datos: flowy_db"
+    echo "   Usuario: flowy_user"
+    echo "   Contraseña: flowy_password"
+    echo ""
+    echo "🔗 URL de conexión:"
+    echo "   postgresql://flowy_user:flowy_password@localhost:5432/flowy_db"
+    echo ""
+    echo "📝 Actualizando archivo .env..."
+    
+    # Actualizar el .env con la URL correcta
+    if [ -f ".env" ]; then
+        # Backup del .env actual
+        cp .env .env.backup
+        
+        # Actualizar la URL de PostgreSQL
+        sed -i '' 's|^DATABASE_URL=.*$|DATABASE_URL="postgresql://flowy_user:flowy_password@localhost:5432/flowy_db?schema=public"|' .env
+        
+        echo "✅ .env actualizado con la URL de PostgreSQL"
+    else
+        # Crear nuevo .env
+        echo "DATABASE_URL="postgresql://flowy_user:flowy_password@localhost:5432/flowy_db?schema=public"" > .env
+        echo "✅ .env creado con la URL de PostgreSQL"
+    fi
+    
+    echo ""
+    echo "🚀 Ahora ejecuta:"
+    echo "   npm run db:push"
+    echo "   npm run db:generate"
+    echo "   npm run dev"
+    echo ""
+    echo "🎯 El login debería funcionar perfectamente con PostgreSQL!"
+    
+else
+    echo "❌ Error en la configuración"
+    echo "Por favor revisa los mensajes de error arriba"
+    exit 1
+fi
