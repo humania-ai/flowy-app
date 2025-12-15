@@ -14,8 +14,7 @@ const TEMP_ADMIN = {
 }
 
 const handler = NextAuth({
-  // Desactivar temporalmente el adapter para el usuario admin
-  // adapter: PrismaAdapter(db),
+  adapter: PrismaAdapter(db),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
