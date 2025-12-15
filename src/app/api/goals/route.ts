@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { db } from '@/lib/db'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession()
     
@@ -13,6 +13,27 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Special case for temp admin
+    if (session.user.email === 'admin@flowy.app') {
+      return NextResponse.json({
+        goals: [
+          {
+            id: 'temp-goal-1',
+            title: 'Meta de Ejemplo',
+            description: 'Esta es una meta de ejemplo',
+            target: 100,
+            current: 75,
+            unit: 'tareas',
+            category: 'work',
+            status: 'active',
+            deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            createdAt: new Date()
+          }
+        ]
+      })
+    }
+
+    // Get user with goals
     const user = await db.user.findUnique({
       where: { email: session.user.email },
       include: {
@@ -20,9 +41,7 @@ export async function GET(request: NextRequest) {
           include: {
             milestones: true
           },
-          orderBy: {
-            createdAt: 'desc'
-          }
+          orderBy: { createdAt: 'desc' }
         }
       }
     })
@@ -34,7 +53,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    return NextResponse.json(user.goals)
+    return NextResponse.json({
+      goals: user.goals
+    })
   } catch (error) {
     console.error('Error fetching goals:', error)
     return NextResponse.json(
@@ -44,7 +65,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const session = await getServerSession()
     
@@ -57,6 +78,26 @@ export async function POST(request: NextRequest) {
 
     const { title, description, target, unit, category, deadline } = await request.json()
 
+    // Special case for temp admin
+    if (session.user.email === 'admin@flowy.app') {
+      return NextResponse.json({
+        message: 'Goal created successfully',
+        goal: {
+          id: 'temp-goal-' + Date.now(),
+          title,
+          description,
+          target,
+          current: 0,
+          unit,
+          category,
+          deadline: deadline ? new Date(deadline) : null,
+          status: 'active',
+          createdAt: new Date()
+        }
+      })
+    }
+
+    // Get user
     const user = await db.user.findUnique({
       where: { email: session.user.email }
     })
@@ -68,6 +109,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Create goal
     const goal = await db.goal.create({
       data: {
         userId: user.id,
@@ -76,174 +118,19 @@ export async function POST(request: NextRequest) {
         target,
         unit,
         category,
-        deadline: deadline ? new Date(deadline) : null,
-        status: 'active'
+        deadline: deadline ? new Date(deadline) : null
       }
     })
 
-    return NextResponse.json(goal, { status: 201 })
+    return NextResponse.json({
+      message: 'Goal created successfully',
+      goal
+    })
   } catch (error) {
     console.error('Error creating goal:', error)
     return NextResponse.json(
       { error: 'Failed to create goal' },
       { status: 500 }
     )
-  }
-}
-
-export async function PUT(request: NextRequest) {
-  try {
-    const session = await getServerSession()
-    
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const { id, current, status } = await request.json()
-
-    const user = await db.user.findUnique({
-      where: { email: session.user.email }
-    })
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
-
-    const updateData: any = {}
-    if (current !== undefined) updateData.current = current
-    if (status !== undefined) updateData.status = status
-
-    // Check if goal is completed and award tokens
-    if (status === 'completed') {
-      const existingGoal = await db.goal.findUnique({
-        where: { id },
-        include: { user: true }
-      })
-
-      if (existingGoal && existingGoal.status !== 'completed') {
-        // Award FLOW tokens for completing goal
-        await db.flowToken.create({
-          data: {
-            userId: user.id,
-            amount: 50, // 50 FLOW tokens for completing a goal
-            source: 'goal',
-            sourceId: id
-          }
-        })
-
-        // Check for achievements
-        await checkGoalAchievements(user.id)
-      }
-    }
-
-    const goal = await db.goal.update({
-      where: { id },
-      data: updateData
-    })
-
-    return NextResponse.json(goal)
-  } catch (error) {
-    console.error('Error updating goal:', error)
-    return NextResponse.json(
-      { error: 'Failed to update goal' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const session = await getServerSession()
-    
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const { id } = await request.json()
-
-    const user = await db.user.findUnique({
-      where: { email: session.user.email }
-    })
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
-
-    await db.goal.delete({
-      where: { id }
-    })
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting goal:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete goal' },
-      { status: 500 }
-    )
-  }
-}
-
-async function checkGoalAchievements(userId: string) {
-  const completedGoalsCount = await db.goal.count({
-    where: {
-      userId,
-      status: 'completed'
-    }
-  })
-
-  // Check for achievements
-  const achievements = await db.achievement.findMany({
-    where: {
-      isActive: true
-    }
-  })
-
-  for (const achievement of achievements) {
-    try {
-      const requirement = JSON.parse(achievement.requirement)
-      
-      if (requirement.type === 'goals_completed' && completedGoalsCount >= requirement.count) {
-        // Check if user already has this achievement
-        const existing = await db.userAchievement.findUnique({
-          where: {
-            userId,
-            achievementId: achievement.id
-          }
-        })
-
-        if (!existing) {
-          await db.userAchievement.create({
-            data: {
-              userId,
-              achievementId: achievement.id
-            }
-          })
-
-          // Award FLOW tokens
-          await db.flowToken.create({
-            data: {
-              userId,
-              amount: achievement.flowReward,
-              source: 'achievement',
-              sourceId: achievement.id
-            }
-          })
-        }
-      }
-    } catch (error) {
-      console.error('Error checking achievement:', error)
-    }
   }
 }

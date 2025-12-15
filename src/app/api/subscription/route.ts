@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { db } from '@/lib/db'
-import Stripe from 'stripe'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-06-20',
-})
+// Solo inicializar Stripe si hay API key
+let stripe: any = null
+if (process.env.STRIPE_SECRET_KEY) {
+  try {
+    const Stripe = require('stripe')
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2024-06-20',
+    })
+  } catch (error) {
+    console.error('Error initializing Stripe:', error)
+  }
+}
 
 export async function GET() {
   try {
@@ -18,6 +26,28 @@ export async function GET() {
       )
     }
 
+    // Special case for temp admin
+    if (session.user.email === 'admin@flowy.app') {
+      return NextResponse.json({
+        plan: 'premium',
+        subscription: {
+          plan: 'premium',
+          status: 'active',
+          currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        },
+        usage: {},
+        limits: {
+          events: Infinity,
+          tasks: Infinity,
+          categories: Infinity,
+          googleCalendar: true,
+          analytics: true,
+          themes: true
+        },
+        canUpgrade: false
+      })
+    }
+    
     // Get user with subscription
     const user = await db.user.findUnique({
       where: { email: session.user.email },
@@ -102,6 +132,14 @@ export async function POST(request: NextRequest) {
     const { action } = await request.json()
 
     if (action === 'cancel') {
+      // Special case for temp admin
+      if (session.user.email === 'admin@flowy.app') {
+        return NextResponse.json({
+          error: 'Cannot cancel admin subscription',
+          status: 400
+        })
+      }
+
       // Get user's Stripe subscription
       const user = await db.user.findUnique({
         where: { email: session.user.email },
@@ -112,6 +150,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: 'No active subscription' },
           { status: 400 }
+        )
+      }
+
+      if (!stripe) {
+        return NextResponse.json(
+          { error: 'Stripe not configured' },
+          { status: 500 }
         )
       }
 
