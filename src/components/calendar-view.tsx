@@ -9,7 +9,16 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useGamification } from '@/contexts/gamification-context'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { toast } from "sonner"
 
+// ... (interface Event se queda igual)
 interface Event {
   id: string
   title: string
@@ -33,6 +42,14 @@ interface Event {
   }>
 }
 
+// Categorías de ejemplo
+const EVENT_CATEGORIES = [
+  { id: '1', name: 'Trabajo', color: '#3B82F6', icon: '💼' },
+  { id: '2', name: 'Personal', color: '#10B981', icon: '👤' },
+  { id: '3', name: 'Reunión', color: '#F59E0B', icon: '🤝' },
+  { id: '4', name: 'Tarea', color: '#8B5CF6', icon: '✅' },
+]
+
 export function CalendarView() {
   const { data: session } = useSession()
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -41,7 +58,20 @@ export function CalendarView() {
   const [showEventForm, setShowEventForm] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month')
-  const { flwyBalance } = useGamification()
+  // Añadimos una comprobación por si el contexto no está disponible
+  const { flwyBalance } = useGamification() || { flwyBalance: 0 }
+
+  const [newEvent, setNewEvent] = useState({
+    title: '',
+    description: '',
+    startDate: new Date(),
+    endDate: new Date(),
+    isAllDay: false,
+    location: '',
+    categoryId: '',
+    status: 'pending'
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     fetchEvents()
@@ -65,51 +95,6 @@ export function CalendarView() {
     }
   }
 
-  const getDaysInMonth = () => {
-    const start = startOfMonth(currentDate)
-    const end = endOfMonth(currentDate)
-    const startWeek = startOfWeek(start, { weekStartsOn: 1 })
-    const endWeek = endOfWeek(end, { weekStartsOn: 1 })
-    return eachDayOfInterval({ start: startWeek, end: endWeek })
-  }
-
-  const getDaysInWeek = () => {
-    const start = startOfWeek(currentDate, { weekStartsOn: 1 })
-    const end = endOfWeek(currentDate, { weekStartsOn: 1 })
-    return eachDayOfInterval({ start, end })
-  }
-
-  const getDaysInView = () => {
-    switch (viewMode) {
-      case 'month':
-        return getDaysInMonth()
-      case 'week':
-        return getDaysInWeek()
-      case 'day':
-        return [currentDate]
-      default:
-        return getDaysInMonth()
-    }
-  }
-
-  const getEventsForDay = (day: Date) => {
-    return events.filter(event => isSameDay(event.startDate, day))
-  }
-
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentDate(prev => direction === 'prev' ? subMonths(prev, 1) : addMonths(prev, 1))
-  }
-
-  const navigateWeek = (direction: 'prev' | 'next') => {
-    const days = direction === 'prev' ? -7 : 7
-    setCurrentDate(prev => new Date(prev.getTime() + days * 24 * 60 * 60 * 1000))
-  }
-
-  const navigateDay = (direction: 'prev' | 'next') => {
-    const days = direction === 'prev' ? -1 : 1
-    setCurrentDate(prev => new Date(prev.getTime() + days * 24 * 60 * 60 * 1000))
-  }
-
   const handleDateClick = (date: Date) => {
     setSelectedDate(date)
     const dayEvents = getEventsForDay(date)
@@ -118,38 +103,113 @@ export function CalendarView() {
     } else if (dayEvents.length > 1) {
       setSelectedDate(date)
     } else {
-      setSelectedDate(date)
+      setNewEvent(prev => ({
+        ...prev,
+        startDate: date,
+        endDate: new Date(date.getTime() + 60 * 60 * 1000)
+      }))
       setShowEventForm(true)
     }
   }
 
+  const handleCreateEvent = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!session?.user?.id) {
+        toast.error("Debes estar logueado para crear un evento.")
+        return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const response = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newEvent,
+          userId: session.user.id,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create event')
+      }
+
+      toast.success("Evento creado exitosamente.")
+      setShowEventForm(false)
+      fetchEvents()
+
+      setNewEvent({
+        title: '',
+        description: '',
+        startDate: new Date(),
+        endDate: new Date(),
+        isAllDay: false,
+        location: '',
+        categoryId: '',
+        status: 'pending'
+      })
+
+    } catch (error) {
+      console.error(error)
+      toast.error("Hubo un error al crear el evento.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // ... (resto de las funciones de ayuda)
+  const getDaysInMonth = () => {
+    const start = startOfMonth(currentDate)
+    const end = endOfMonth(currentDate)
+    const startWeek = startOfWeek(start, { weekStartsOn: 1 })
+    const endWeek = endOfWeek(end, { weekStartsOn: 1 })
+    return eachDayOfInterval({ start: startWeek, end: endWeek })
+  }
+  const getDaysInWeek = () => {
+    const start = startOfWeek(currentDate, { weekStartsOn: 1 })
+    const end = endOfWeek(currentDate, { weekStartsOn: 1 })
+    return eachDayOfInterval({ start, end })
+  }
+  const getDaysInView = () => {
+    switch (viewMode) {
+      case 'month': return getDaysInMonth()
+      case 'week': return getDaysInWeek()
+      case 'day': return [currentDate]
+      default: return getDaysInMonth()
+    }
+  }
+  const getEventsForDay = (day: Date) => {
+    return events.filter(event => isSameDay(event.startDate, day))
+  }
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentDate(prev => direction === 'prev' ? subMonths(prev, 1) : addMonths(prev, 1))
+  }
+  const navigateWeek = (direction: 'prev' | 'next') => {
+    const days = direction === 'prev' ? -7 : 7
+    setCurrentDate(prev => new Date(prev.getTime() + days * 24 * 60 * 60 * 1000))
+  }
+  const navigateDay = (direction: 'prev' | 'next') => {
+    const days = direction === 'prev' ? -1 : 1
+    setCurrentDate(prev => new Date(prev.getTime() + days * 24 * 60 * 60 * 1000))
+  }
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'confirmed':
-        return 'bg-green-100 text-green-800 border-green-200'
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'cancelled':
-        return 'bg-red-100 text-red-800 border-red-200'
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
+      case 'confirmed': return 'bg-green-100 text-green-800 border-green-200'
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200'
+      default: return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
-
   const formatEventTime = (event: Event) => {
-    if (event.isAllDay) {
-      return 'Todo el día'
-    }
+    if (event.isAllDay) return 'Todo el día'
     return `${format(event.startDate, 'HH:mm')} - ${format(event.endDate, 'HH:mm')}`
   }
-
-  // --- NUEVA VISTA PARA MÓVIL (AGENDA) ---
+  
+  // --- VISTA PARA MÓVIL (AGENDA) ---
   const renderMobileAgendaView = () => {
     const eventsByDay = events.reduce((acc, event) => {
       const day = format(event.startDate, 'yyyy-MM-dd')
-      if (!acc[day]) {
-        acc[day] = []
-      }
+      if (!acc[day]) acc[day] = []
       acc[day].push(event)
       acc[day].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
       return acc
@@ -351,7 +411,6 @@ export function CalendarView() {
 
   return (
     <div className="space-y-6">
-      {/* Header Responsivo */}
       <Card className="border-0 shadow-lg">
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <CardTitle className="flex items-center gap-2">
@@ -370,106 +429,97 @@ export function CalendarView() {
             <Button variant="outline" size="sm" onClick={() => viewMode === 'month' ? navigateMonth('next') : viewMode === 'week' ? navigateWeek('next') : navigateDay('next')}>
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <Button onClick={() => setShowEventForm(true)} className="w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Evento
-            </Button>
+            <Dialog open={showEventForm} onOpenChange={setShowEventForm}>
+              <DialogTrigger asChild>
+                <Button className="w-full sm:w-auto">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nuevo Evento
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Crear Nuevo Evento</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleCreateEvent} className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="title" className="text-right">Título</Label>
+                    <Input id="title" value={newEvent.title} onChange={(e) => setNewEvent({...newEvent, title: e.target.value})} className="col-span-3" required />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="description" className="text-right">Descripción</Label>
+                    <Textarea id="description" value={newEvent.description} onChange={(e) => setNewEvent({...newEvent, description: e.target.value})} className="col-span-3" />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="category" className="text-right">Categoría</Label>
+                    <Select value={newEvent.categoryId} onValueChange={(value) => setNewEvent({...newEvent, categoryId: value})}>
+                      <SelectTrigger className="col-span-3"><SelectValue placeholder="Selecciona una categoría" /></SelectTrigger>
+                      <SelectContent>{EVENT_CATEGORIES.map(cat => (<SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.name}</SelectItem>))}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="startDate" className="text-right">Inicio</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className={`col-span-3 justify-start text-left font-normal ${!newEvent.startDate && "text-muted-foreground"}`}>
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {newEvent.startDate ? format(newEvent.startDate, "PPP") : <span>Selecciona una fecha</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar mode="single" selected={newEvent.startDate} onSelect={(date) => date && setNewEvent({...newEvent, startDate: date})} initialFocus />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="endDate" className="text-right">Fin</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className={`col-span-3 justify-start text-left font-normal ${!newEvent.endDate && "text-muted-foreground"}`}>
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {newEvent.endDate ? format(newEvent.endDate, "PPP") : <span>Selecciona una fecha</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar mode="single" selected={newEvent.endDate} onSelect={(date) => date && setNewEvent({...newEvent, endDate: date})} initialFocus />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="location" className="text-right">Ubicación</Label>
+                    <Input id="location" value={newEvent.location} onChange={(e) => setNewEvent({...newEvent, location: e.target.value})} className="col-span-3" />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setShowEventForm(false)}>Cancelar</Button>
+                    <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar Evento'}</Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         </CardHeader>
       </Card>
 
-      {/* Mobile View: Agenda */}
-      <div className="lg:hidden">
-        {renderMobileAgendaView()}
-      </div>
+      <div className="lg:hidden">{renderMobileAgendaView()}</div>
+      <div className="max-lg:hidden">{renderCalendarGrid()}</div>
 
-      {/* Desktop View: Calendar Grid */}
-      <div className="max-lg:hidden">
-        {renderCalendarGrid()}
-      </div>
-
-      {/* Event Details Modal */}
       {selectedEvent && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>{selectedEvent.title}</span>
-                <Button variant="ghost" size="sm" onClick={() => setSelectedEvent(null)}>
-                  ×
-                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedEvent(null)}>×</Button>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {selectedEvent.description && (
-                <div>
-                  <h4 className="font-medium text-slate-900 mb-1">Descripción</h4>
-                  <p className="text-slate-600">{selectedEvent.description}</p>
-                </div>
-              )}
-              
+              {selectedEvent.description && (<div><h4 className="font-medium text-slate-900 mb-1">Descripción</h4><p className="text-slate-600">{selectedEvent.description}</p></div>)}
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-medium text-slate-900 mb-1">Fecha</h4>
-                  <p className="text-slate-600">
-                    {format(selectedEvent.startDate, 'PPP', { locale: es })}
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-medium text-slate-900 mb-1">Hora</h4>
-                  <p className="text-slate-600">
-                    {formatEventTime(selectedEvent)}
-                  </p>
-                </div>
+                <div><h4 className="font-medium text-slate-900 mb-1">Fecha</h4><p className="text-slate-600">{format(selectedEvent.startDate, 'PPP', { locale: es })}</p></div>
+                <div><h4 className="font-medium text-slate-900 mb-1">Hora</h4><p className="text-slate-600">{formatEventTime(selectedEvent)}</p></div>
               </div>
-
-              {selectedEvent.location && (
-                <div>
-                  <h4 className="font-medium text-slate-900 mb-1">Ubicación</h4>
-                  <p className="text-slate-600">{selectedEvent.location}</p>
-                </div>
-              )}
-
-              <div>
-                <h4 className="font-medium text-slate-900 mb-1">Estado</h4>
-                <Badge className={getStatusColor(selectedEvent.status)}>
-                  {selectedEvent.status === 'confirmed' ? 'Confirmado' : 
-                   selectedEvent.status === 'pending' ? 'Pendiente' : 'Cancelado'}
-                </Badge>
-              </div>
-
-              {selectedEvent.category && (
-                <div>
-                  <h4 className="font-medium text-slate-900 mb-1">Categoría</h4>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{selectedEvent.category.icon}</span>
-                    <span>{selectedEvent.category.name}</span>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* New Event Form Modal */}
-      {showEventForm && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Nuevo Evento</span>
-                <Button variant="ghost" size="sm" onClick={() => setShowEventForm(false)}>
-                  ×
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <CalendarIcon className="h-12 w-12 mx-auto mb-4 text-blue-600" />
-                <p className="text-slate-600 mb-2">Formulario de evento en desarrollo</p>
-                <p className="text-sm text-slate-500">Próximamente podrás crear eventos completos</p>
-              </div>
+              {selectedEvent.location && (<div><h4 className="font-medium text-slate-900 mb-1">Ubicación</h4><p className="text-slate-600">{selectedEvent.location}</p></div>)}
+              <div><h4 className="font-medium text-slate-900 mb-1">Estado</h4><Badge className={getStatusColor(selectedEvent.status)}>{selectedEvent.status === 'confirmed' ? 'Confirmado' : selectedEvent.status === 'pending' ? 'Pendiente' : 'Cancelado'}</Badge></div>
+              {selectedEvent.category && (<div><h4 className="font-medium text-slate-900 mb-1">Categoría</h4><div className="flex items-center gap-2"><span className="text-lg">{selectedEvent.category.icon}</span><span>{selectedEvent.category.name}</span></div></div>)}
             </CardContent>
           </Card>
         </div>
