@@ -14,7 +14,8 @@ const TEMP_ADMIN = {
 }
 
 const handler = NextAuth({
-  adapter: PrismaAdapter(db),
+  // Desactivar temporalmente el adapter para el usuario admin
+  // adapter: PrismaAdapter(db),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -64,7 +65,7 @@ const handler = NextAuth({
           }
         }
 
-        // Try database for other users
+        // Para otros usuarios, intentar con la BD (con error handling)
         try {
           const user = await db.user.findUnique({
             where: {
@@ -73,6 +74,7 @@ const handler = NextAuth({
           })
 
           if (!user || !user.password) {
+            console.log('User not found or no password')
             return null
           }
 
@@ -82,9 +84,11 @@ const handler = NextAuth({
           )
 
           if (!isPasswordValid) {
+            console.log('User password invalid')
             return null
           }
 
+          console.log('User login successful')
           return {
             id: user.id,
             email: user.email,
