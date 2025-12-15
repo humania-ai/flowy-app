@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route"; // Asegúrate que esta ruta sea correcta
 import { Toaster } from "@/components/ui/toaster";
 import { Providers } from "@/components/providers";
 
@@ -41,11 +43,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+// 1. Haz la función asíncrona
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // 2. Obtén la sesión en el servidor
+  const session = await getServerSession(authOptions);
+  // ¡AÑADE ESTE LOG!
+  console.log('🔍 [layout.tsx] Session from getServerSession:', session);
+    
+
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
@@ -60,7 +69,8 @@ export default function RootLayout({
       <body
         className={`${inter.variable} font-sans antialiased bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen`}
       >
-        <Providers>
+        {/* 3. Pasa la sesión como prop a Providers */}
+        <Providers session={session}>
           {children}
           <Toaster />
         </Providers>

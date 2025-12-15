@@ -3,6 +3,9 @@
 echo "🔧 Configuración Manual de PostgreSQL para Flowy"
 echo "=================================="
 
+# Obtenemos el nombre de usuario actual del sistema operativo
+CURRENT_USER=$(whoami)
+
 echo "📋 Verificando instalación de PostgreSQL..."
 
 # Buscar PostgreSQL en ubicaciones comunes
@@ -84,29 +87,25 @@ fi
 
 # Crear base de datos si no existe
 echo "🗄️ Creando base de datos flowy_db..."
-$PSQL_PATH -U postgres -h localhost -p 5432 -c "
-CREATE DATABASE flowy_db;
-\q
-" 2>/dev/null
+# CAMBIO CLAVE: Se elimina -U postgres para usar el usuario actual del sistema
+ $PSQL_PATH -h localhost -p 5432 -c "CREATE DATABASE flowy_db;" 2>/dev/null
 
 # Crear usuario si no existe
 echo "👤 Creando usuario flowy_user..."
-$PSQL_PATH -U postgres -h localhost -p 5432 -c "
-CREATE USER flowy_user WITH PASSWORD 'flowy_password';
-\q
-" 2>/dev/null
+# CAMBIO CLAVE: Se elimina -U postgres
+ $PSQL_PATH -h localhost -p 5432 -c "CREATE USER flowy_user WITH PASSWORD 'flowy_password';" 2>/dev/null
 
 # Dar permisos
 echo "🔐 Configurando permisos..."
-$PSQL_PATH -U postgres -h localhost -p 5432 -c "
+# CAMBIO CLAVE: Se elimina -U postgres
+ $PSQL_PATH -h localhost -p 5432 -c "
 -- Dar todos los permisos al usuario flowy_user
 GRANT ALL PRIVILEGES ON DATABASE flowy_db TO flowy_user;
 GRANT ALL PRIVILEGES ON SCHEMA public TO flowy_user;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT flowy_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO flowy_user; -- Corregido para que sea sintácticamente correcto
 
 -- Hacer owner de la base de datos
 ALTER DATABASE flowy_db OWNER TO flowy_user;
-\q
 " 2>/dev/null
 
 if [ $? -eq 0 ]; then
@@ -135,7 +134,7 @@ if [ $? -eq 0 ]; then
         echo "✅ .env actualizado con la URL de PostgreSQL"
     else
         # Crear nuevo .env
-        echo "DATABASE_URL="postgresql://flowy_user:flowy_password@localhost:5432/flowy_db?schema=public"" > .env
+        echo "DATABASE_URL=\"postgresql://flowy_user:flowy_password@localhost:5432/flowy_db?schema=public\"" > .env
         echo "✅ .env creado con la URL de PostgreSQL"
     fi
     

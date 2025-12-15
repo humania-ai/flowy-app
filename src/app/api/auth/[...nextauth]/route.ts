@@ -1,7 +1,9 @@
+// app/api/auth/[...nextauth]/route.ts
+
 import NextAuth from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { PrismaAdapter } from '@auth/prisma-adapter'
+//import { PrismaAdapter } from '@auth/prisma-adapter'
 import { db } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 
@@ -13,8 +15,9 @@ const TEMP_ADMIN = {
   id: 'temp-admin-id'
 }
 
-const handler = NextAuth({
-  adapter: PrismaAdapter(db),
+// 1. Crea una constante para tus opciones y expórtala
+export const authOptions = {
+//  adapter: PrismaAdapter(db),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -69,7 +72,15 @@ const handler = NextAuth({
           const user = await db.user.findUnique({
             where: {
               email: credentials.email
-            }
+            },
+            select: { // Mantén este select
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+            password: true, // Ahora esto funciona
+          }
+
           })
 
           if (!user || !user.password) {
@@ -102,24 +113,52 @@ const handler = NextAuth({
     })
   ],
   callbacks: {
-    async jwt({ token, account }) {
-      if (account) {
-        token.accessToken = account.access_token
-        token.refreshToken = account.refresh_token
+   /**
+     * @param  {object}  token     Decrypted JSON Web Token
+     * @param  {object}  user      User object      (solo disponible en el primer sign-in)
+     * @param  {object}  account   Provider account (solo disponible en el primer sign-in con OAuth)
+     * @return {object}            JSON Web Token that will be saved
+     */
+    async jwt({ token, user, account }) {
+      // 1. Si el usuario inicia sesión por primera vez (con cualquier proveedor), `user` existe.
+      if (user) {
+        token.id = user.id; // Guardamos el ID del usuario en el token
+        token.name = user.name;
+        token.email = user.email;
       }
-      return token
+
+      // 2. Si es un proveedor OAuth, `account` también existe. Guardamos los tokens de acceso.
+      if (account) {
+        token.accessToken = account.access_token;
+        token.refreshToken = account.refresh_token;
+      }
+      
+      return token;
     },
+
+    /**
+     * @param  {object} session      Session object
+     * @param  {object} token        User object    (si usas strategy: "jwt")
+     * @return {object}              Session object that will be returned to the client
+     */
     async session({ session, token }) {
-      session.accessToken = token.accessToken as string
-      session.refreshToken = token.refreshToken as string
-      return session
-    }
+      // 3. Pasamos la información del token a la sesión que se usa en el cliente.
+      if (token && session.user) {
+        session.user.id = token.id as string;
+        session.accessToken = token.accessToken as string;
+        session.refreshToken = token.refreshToken as string;
+      }
+      return session;
+    },
   },
   pages: {
     signIn: '/auth/signin',
     signUp: '/auth/signup',
     error: '/auth/signin'
   }
-})
+}
+
+// 2. Pasa la constante exportada a NextAuth
+const handler = NextAuth(authOptions)
 
 export { handler as GET, handler as POST }

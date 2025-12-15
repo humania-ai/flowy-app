@@ -5,9 +5,12 @@ import { LanguageProvider } from '@/contexts/language-context'
 import { SubscriptionProvider } from '@/contexts/subscription-context'
 import { GamificationProvider } from '@/contexts/gamification-context'
 
-export function Providers({ children }: { children: React.ReactNode }) {
+
+
+export function Providers({ children, session }: { children: React.ReactNode; session?: any }) {
   return (
-    <SessionProvider session={null}>
+    // Pasa la sesión al SessionProvider
+    <SessionProvider session={session}>
       <LanguageProvider>
         <SubscriptionProvider>
           <GamificationProvider>

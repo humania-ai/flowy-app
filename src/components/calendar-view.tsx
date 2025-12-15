@@ -116,10 +116,8 @@ export function CalendarView() {
     if (dayEvents.length === 1) {
       setSelectedEvent(dayEvents[0])
     } else if (dayEvents.length > 1) {
-      // Mostrar lista de eventos del día
       setSelectedDate(date)
     } else {
-      // Crear nuevo evento en esta fecha
       setSelectedDate(date)
       setShowEventForm(true)
     }
@@ -145,43 +143,118 @@ export function CalendarView() {
     return `${format(event.startDate, 'HH:mm')} - ${format(event.endDate, 'HH:mm')}`
   }
 
+  // --- NUEVA VISTA PARA MÓVIL (AGENDA) ---
+  const renderMobileAgendaView = () => {
+    const eventsByDay = events.reduce((acc, event) => {
+      const day = format(event.startDate, 'yyyy-MM-dd')
+      if (!acc[day]) {
+        acc[day] = []
+      }
+      acc[day].push(event)
+      acc[day].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
+      return acc
+    }, {} as Record<string, Event[]>)
+
+    const sortedDays = Object.keys(eventsByDay).sort()
+
+    if (sortedDays.length === 0) {
+      return (
+        <Card className="border-0 shadow-lg">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <CalendarIcon className="h-16 w-16 text-slate-300 mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900">No hay eventos este mes</h3>
+            <p className="text-slate-500">Toca el botón para crear tu primer evento.</p>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        {sortedDays.map(dayString => {
+          const dayEvents = eventsByDay[dayString]
+          return (
+            <Card key={dayString} className="border-0 shadow-md">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold">
+                  {format(new Date(dayString), 'EEEE d \'de\' MMMM', { locale: es })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-0">
+                {dayEvents.map(event => (
+                  <div
+                    key={event.id}
+                    className="flex items-start gap-3 p-3 -mx-3 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+                    onClick={() => setSelectedEvent(event)}
+                  >
+                    <div
+                      className="w-1 h-12 rounded-full mt-1 flex-shrink-0"
+                      style={{ backgroundColor: event.category?.color || '#3B82F6' }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-900 truncate">{event.title}</p>
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <Clock className="h-4 w-4 flex-shrink-0" />
+                        <span>{formatEventTime(event)}</span>
+                        {event.location && (
+                          <>
+                            <MapPin className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{event.location}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <Badge className={`shrink-0 ${getStatusColor(event.status)}`}>
+                      {event.status === 'confirmed' ? 'Confirmado' : event.status === 'pending' ? 'Pendiente' : 'Cancelado'}
+                    </Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+    )
+  }
+
+  // --- VISTA DE ESCRITORIO (CUADRÍCULA) ---
   const renderCalendarGrid = () => {
     const days = getDaysInView()
     const weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 
     if (viewMode === 'day') {
       return (
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="p-4 border-b border-gray-200">
+        <div className="bg-white rounded-xl shadow-lg border-0">
+          <div className="p-6 border-b border-slate-100">
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-slate-900">
                 {format(currentDate, 'd')}
               </div>
-              <div className="text-lg text-gray-600">
+              <div className="text-lg text-slate-600">
                 {format(currentDate, 'EEEE', { locale: es })}
               </div>
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-slate-500">
                 {format(currentDate, 'MMMM yyyy', { locale: es })}
               </div>
             </div>
           </div>
-          <div className="p-4">
+          <div className="p-6">
             <div className="space-y-2">
               {getEventsForDay(currentDate).map(event => (
                 <div key={event.id} className="p-3 border rounded-lg hover:shadow-md transition-shadow cursor-pointer"
                      style={{ borderColor: event.category?.color || '#3B82F6' }}
                      onClick={() => setSelectedEvent(event)}>
                   <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-semibold text-gray-900">{event.title}</h4>
+                    <h4 className="font-semibold text-slate-900">{event.title}</h4>
                     <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(event.status)}`}>
                       {event.status === 'confirmed' ? 'Confirmado' : 
                        event.status === 'pending' ? 'Pendiente' : 'Cancelado'}
                     </span>
                   </div>
                   {event.description && (
-                    <p className="text-sm text-gray-600 mb-2">{event.description}</p>
+                    <p className="text-sm text-slate-600 mb-2">{event.description}</p>
                   )}
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <div className="flex items-center gap-4 text-sm text-slate-500">
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
                       <span>{formatEventTime(event)}</span>
@@ -202,7 +275,7 @@ export function CalendarView() {
                 </div>
               ))}
               {getEventsForDay(currentDate).length === 0 && (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-slate-500">
                   <CalendarIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No hay eventos para este día</p>
                   <p className="text-sm">Crea un nuevo evento para empezar</p>
@@ -215,45 +288,18 @@ export function CalendarView() {
     }
 
     return (
-      <div className="bg-white rounded-lg border border-gray-200">
-        {/* Header */}
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">
-              {format(currentDate, 'MMMM yyyy', { locale: es })}
-            </h2>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => viewMode === 'month' ? navigateMonth('prev') : viewMode === 'week' ? navigateWeek('prev') : navigateDay('prev')}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setViewMode('day')}>
-                Día
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setViewMode('week')}>
-                Semana
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setViewMode('month')}>
-                Mes
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => viewMode === 'month' ? navigateMonth('next') : viewMode === 'week' ? navigateWeek('next') : navigateDay('next')}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          
-          {/* Week days header */}
-          <div className="grid grid-cols-7 gap-2 text-center">
+      <div className="bg-white rounded-xl shadow-lg border-0">
+        <div className="p-6 border-b border-slate-100">
+          <div className="grid grid-cols-7 gap-4 text-center">
             {weekDays.map(day => (
-              <div key={day} className="text-sm font-medium text-gray-600 py-2">
+              <div key={day} className="text-sm font-medium text-slate-600 py-2">
                 {day}
               </div>
             ))}
           </div>
         </div>
-
-        {/* Calendar Grid */}
-        <div className="p-4">
-          <div className="grid grid-cols-7 gap-2">
+        <div className="p-6">
+          <div className="grid grid-cols-7 gap-4">
             {days.map((day, index) => {
               const isCurrentMonth = isSameMonth(day, currentDate)
               const isToday = isSameDay(day, new Date())
@@ -262,8 +308,8 @@ export function CalendarView() {
               return (
                 <div
                   key={index}
-                  className={`min-h-24 p-2 border rounded-lg cursor-pointer transition-colors ${
-                    !isCurrentMonth ? 'bg-gray-50 text-gray-400' : 'bg-white hover:bg-blue-50'
+                  className={`min-h-28 p-3 border border-slate-100 rounded-xl cursor-pointer transition-colors ${
+                    !isCurrentMonth ? 'bg-slate-50 text-slate-400' : 'bg-white hover:bg-slate-50'
                   } ${isToday ? 'ring-2 ring-blue-500' : ''}`}
                   onClick={() => handleDateClick(day)}
                 >
@@ -271,10 +317,11 @@ export function CalendarView() {
                     {format(day, 'd')}
                   </div>
                   <div className="space-y-1">
-                    {dayEvents.slice(0, 3).map((event, eventIndex) => (
-                      <div
+                    {dayEvents.slice(0, 3).map((event) => (
+                      <Badge
                         key={event.id}
-                        className="text-xs p-1 rounded truncate cursor-pointer hover:opacity-80"
+                        variant="secondary"
+                        className="truncate cursor-pointer justify-start font-medium text-xs"
                         style={{ 
                           backgroundColor: event.category?.color || '#3B82F6',
                           color: 'white'
@@ -285,10 +332,10 @@ export function CalendarView() {
                         }}
                       >
                         {event.title}
-                      </div>
+                      </Badge>
                     ))}
                     {dayEvents.length > 3 && (
-                      <div className="text-xs text-gray-500 text-center">
+                      <div className="text-xs text-slate-500 text-center">
                         +{dayEvents.length - 3} más
                       </div>
                     )}
@@ -304,22 +351,42 @@ export function CalendarView() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <Card>
-        <CardHeader className="flex items-center justify-between">
+      {/* Header Responsivo */}
+      <Card className="border-0 shadow-lg">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <CardTitle className="flex items-center gap-2">
             <CalendarIcon className="h-5 w-5 text-blue-600" />
-            Calendario
+            <span>{format(currentDate, 'MMMM yyyy', { locale: es })}</span>
           </CardTitle>
-          <Button onClick={() => setShowEventForm(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Evento
-          </Button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button variant="outline" size="sm" onClick={() => viewMode === 'month' ? navigateMonth('prev') : viewMode === 'week' ? navigateWeek('prev') : navigateDay('prev')}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="hidden sm:flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setViewMode('day')}>Día</Button>
+              <Button variant="outline" size="sm" onClick={() => setViewMode('week')}>Semana</Button>
+              <Button variant="outline" size="sm" onClick={() => setViewMode('month')}>Mes</Button>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => viewMode === 'month' ? navigateMonth('next') : viewMode === 'week' ? navigateWeek('next') : navigateDay('next')}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => setShowEventForm(true)} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Evento
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent>
-          {renderCalendarGrid()}
-        </CardContent>
       </Card>
+
+      {/* Mobile View: Agenda */}
+      <div className="lg:hidden">
+        {renderMobileAgendaView()}
+      </div>
+
+      {/* Desktop View: Calendar Grid */}
+      <div className="max-lg:hidden">
+        {renderCalendarGrid()}
+      </div>
 
       {/* Event Details Modal */}
       {selectedEvent && (
@@ -336,21 +403,21 @@ export function CalendarView() {
             <CardContent className="space-y-4">
               {selectedEvent.description && (
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-1">Descripción</h4>
-                  <p className="text-gray-600">{selectedEvent.description}</p>
+                  <h4 className="font-medium text-slate-900 mb-1">Descripción</h4>
+                  <p className="text-slate-600">{selectedEvent.description}</p>
                 </div>
               )}
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-1">Fecha</h4>
-                  <p className="text-gray-600">
+                  <h4 className="font-medium text-slate-900 mb-1">Fecha</h4>
+                  <p className="text-slate-600">
                     {format(selectedEvent.startDate, 'PPP', { locale: es })}
                   </p>
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-1">Hora</h4>
-                  <p className="text-gray-600">
+                  <h4 className="font-medium text-slate-900 mb-1">Hora</h4>
+                  <p className="text-slate-600">
                     {formatEventTime(selectedEvent)}
                   </p>
                 </div>
@@ -358,13 +425,13 @@ export function CalendarView() {
 
               {selectedEvent.location && (
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-1">Ubicación</h4>
-                  <p className="text-gray-600">{selectedEvent.location}</p>
+                  <h4 className="font-medium text-slate-900 mb-1">Ubicación</h4>
+                  <p className="text-slate-600">{selectedEvent.location}</p>
                 </div>
               )}
 
               <div>
-                <h4 className="font-medium text-gray-900 mb-1">Estado</h4>
+                <h4 className="font-medium text-slate-900 mb-1">Estado</h4>
                 <Badge className={getStatusColor(selectedEvent.status)}>
                   {selectedEvent.status === 'confirmed' ? 'Confirmado' : 
                    selectedEvent.status === 'pending' ? 'Pendiente' : 'Cancelado'}
@@ -373,7 +440,7 @@ export function CalendarView() {
 
               {selectedEvent.category && (
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-1">Categoría</h4>
+                  <h4 className="font-medium text-slate-900 mb-1">Categoría</h4>
                   <div className="flex items-center gap-2">
                     <span className="text-lg">{selectedEvent.category.icon}</span>
                     <span>{selectedEvent.category.name}</span>
@@ -400,8 +467,8 @@ export function CalendarView() {
             <CardContent>
               <div className="text-center py-8">
                 <CalendarIcon className="h-12 w-12 mx-auto mb-4 text-blue-600" />
-                <p className="text-gray-600 mb-2">Formulario de evento en desarrollo</p>
-                <p className="text-sm text-gray-500">Próximamente podrás crear eventos completos</p>
+                <p className="text-slate-600 mb-2">Formulario de evento en desarrollo</p>
+                <p className="text-sm text-slate-500">Próximamente podrás crear eventos completos</p>
               </div>
             </CardContent>
           </Card>

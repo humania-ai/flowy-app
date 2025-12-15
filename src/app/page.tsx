@@ -18,11 +18,15 @@ import { OfflineMode } from '@/components/offline-mode'
 import { useRouter } from 'next/navigation'
 
 export default function Home() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const router = useRouter()
   const { isPremium } = useSubscription()
   const { flwyBalance } = useGamification()
   const [activeView, setActiveView] = useState<'calendar' | 'tasks' | 'goals' | 'rewards' | 'dashboard' | 'referrals'>('calendar')
+
+  // ¡AÑADE ESTE LOG!
+  console.log('🔍 [Home.tsx] useSession status:', status);
+  console.log('🔍 [Home.tsx] useSession data:', session);
 
   if (!session) {
     return (
@@ -33,7 +37,7 @@ export default function Home() {
               F
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Bienvenido a Flowy
+              Bienvenido a Flowy 2
             </h1>
             <p className="text-gray-600 mb-6">
               Tu agenda inteligente para organizar tu vida
