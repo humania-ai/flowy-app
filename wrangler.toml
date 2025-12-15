@@ -1,0 +1,29 @@
+name = "flowy"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[env.production]
+name = "flowy-prod"
+routes = [
+  { pattern = "flowy.pages.dev", custom_domain = true }
+]
+
+[env.staging]
+name = "flowy-staging"
+
+# Environment variables
+[vars]
+NEXTAUTH_URL = "https://flowy.pages.dev"
+NODE_ENV = "production"
+
+# KV namespace for caching
+[[kv_namespaces]]
+binding = "FLOWY_CACHE"
+id = "your-kv-namespace-id"
+preview_id = "your-preview-kv-namespace-id"
+
+# D1 database (optional, for serverless database)
+[[d1_databases]]
+binding = "DB"
+database_name = "flowy-db"
+database_id = "your-database-id"

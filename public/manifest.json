@@ -1,0 +1,56 @@
+{
+  "name": "Flowy - Tu Agenda Inteligente",
+  "short_name": "Flowy",
+  "description": "Organiza tu vida con calendario, tareas y sincronización con Google Calendar",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait",
+  "scope": "/",
+  "lang": "es",
+  "categories": ["productivity", "business", "utilities"],
+  "icons": [
+    {
+      "src": "/logo-icon.svg",
+      "sizes": "16x16",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/logo-small.svg",
+      "sizes": "40x40",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/logo.svg",
+      "sizes": "120x120",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nuevo Evento",
+      "short_name": "Evento",
+      "description": "Crear un nuevo evento",
+      "url": "/calendar?new=true",
+      "icons": [
+        {
+          "src": "/logo-icon.svg",
+          "sizes": "16x16"
+        }
+      ]
+    },
+    {
+      "name": "Nueva Tarea",
+      "short_name": "Tarea",
+      "description": "Crear una nueva tarea",
+      "url": "/tasks?new=true",
+      "icons": [
+        {
+          "src": "/logo-icon.svg",
+          "sizes": "16x16"
+        }
+      ]
+    }
+  ]
+}

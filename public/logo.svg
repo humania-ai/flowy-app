@@ -1,0 +1,38 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle with gradient -->
+  <defs>
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#60A5FA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3B82F6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main circle -->
+  <circle cx="60" cy="60" r="50" fill="url(#logoGradient)"/>
+  
+  <!-- Wave pattern -->
+  <path d="M25 60 Q35 50, 45 60 T65 60 T85 60" 
+        stroke="white" 
+        stroke-width="3" 
+        fill="none" 
+        opacity="0.9"/>
+  
+  <path d="M25 70 Q35 60, 45 70 T65 70 T85 70" 
+        stroke="white" 
+        stroke-width="2" 
+        fill="none" 
+        opacity="0.7"/>
+  
+  <!-- Circular dots -->
+  <circle cx="35" cy="45" r="3" fill="white" opacity="0.9"/>
+  <circle cx="60" cy="40" r="4" fill="white" opacity="0.9"/>
+  <circle cx="85" cy="45" r="3" fill="white" opacity="0.9"/>
+  
+  <!-- F letter -->
+  <text x="60" y="75" 
+        font-family="Arial, sans-serif" 
+        font-size="28" 
+        font-weight="bold" 
+        fill="white" 
+        text-anchor="middle">F</text>
+</svg>
