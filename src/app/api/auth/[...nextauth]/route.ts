@@ -8,7 +8,7 @@ import bcrypt from 'bcryptjs'
 // Usuario temporal en memoria para testing
 const TEMP_ADMIN = {
   email: 'admin@flowy.app',
-  password: '$2a$12$LQv3c1yqBWVHxkd0LdJ.uywYmzUq3bQ9tQGC9RrKJJMZ9z7S9uK', // bcryptjs hash de "admin"
+  password: '$2b$12$axdRWn/ZiAC4iC3rr6rKEu02pv4aAAxvY0urI.vwKqAnnXWqE/2P2', // bcryptjs hash de "admin"
   name: 'Administrador',
   id: 'temp-admin-id'
 }
@@ -35,24 +35,32 @@ const handler = NextAuth({
         password: { label: 'Contraseña', type: 'password' }
       },
       async authorize(credentials) {
+        console.log('Credentials received:', credentials?.email, 'password provided:', !!credentials?.password)
+        
         if (!credentials?.email || !credentials?.password) {
+          console.log('Missing credentials')
           return null
         }
 
         // Special case for admin user (temporal workaround)
         if (credentials.email === 'admin@flowy.app') {
+          console.log('Admin login attempt')
           const isPasswordValid = await bcrypt.compare(
             credentials.password,
             TEMP_ADMIN.password
           )
+          console.log('Admin password valid:', isPasswordValid)
 
           if (isPasswordValid) {
+            console.log('Admin login successful')
             return {
               id: TEMP_ADMIN.id,
               email: TEMP_ADMIN.email,
               name: TEMP_ADMIN.name,
               image: null,
             }
+          } else {
+            console.log('Admin password invalid')
           }
         }
 
